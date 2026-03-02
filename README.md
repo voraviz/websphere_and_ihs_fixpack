@@ -60,7 +60,7 @@ Totals:     WAS (27), IHS (6)
 
 ## Output Format
 
-The script generates a CSV file named `was_fix_pack_<version>.csv` (e.g., `was_fix_pack_90526.csv`).
+The script generates a CSV file named `was_fix_pack_<version>_YYYYMMDD.csv` (e.g., `was_fix_pack_90526_20251202.csv`).
 
 The columns include: `Source`, `APAR Number`, `isSecurity`, `Title`, `Reported component name`, `Status`, `PE`, `HIPER`, `Submitted date`, `Closed date`.
 
