@@ -17,6 +17,31 @@ def format_date_for_file(date_str):
     except Exception:
         return "UnknownDate"
 
+def find_latest_version(url, headers):
+    """Scans the page to find the most recent version in the table."""
+    try:
+        resp = requests.get(url, headers=headers, timeout=15)
+        if resp.status_code == 200:
+            soup = BeautifulSoup(resp.text, 'html.parser')
+            # Look for IDs that follow the V.R.M.F pattern (4-5 digits) inside the main table
+            table = soup.find('table', class_='bx--data-table')
+            if table:
+                # IBM typically puts the latest version in the first <tr> or via an <a> tag ID
+                # We look for the first element with an ID that looks like a version anchor
+                anchors = soup.find_all(id=re.compile(r'^\d{4,5}$'))
+                if anchors:
+                    # The first one found on the page is usually the latest
+                    latest_anchor = anchors[0]['id']
+                    # Reconstruct dots: 90526 -> 9.0.5.26
+                    if len(latest_anchor) == 5:
+                        return f"{latest_anchor[0]}.{latest_anchor[1]}.{latest_anchor[2]}.{latest_anchor[3:]}"
+                    elif len(latest_anchor) == 4:
+                        return f"{latest_anchor[0]}.{latest_anchor[1]}.{latest_anchor[2]}.{latest_anchor[3]}"
+        return None
+    except Exception as e:
+        print(f"Error finding latest version: {e}")
+        return None
+
 def get_detailed_info(apar_num, headers, fields_to_track, item, source):
     """Scrapes the individual APAR page for metadata."""
     row_data = {field: "N/A" for field in fields_to_track}
@@ -75,18 +100,14 @@ def scrape_table_logic(soup, anchor_id, table_class=None, find_meta=False):
     
     if find_meta:
         table_text = parent_table.get_text(" ", strip=True)
-        
         rel_match = re.search(r'Fix release date:\s*(\d{1,2}\s+\w+\s+\d{4})', table_text, re.I)
-        if rel_match:
-            meta["Release Date"] = rel_match.group(1).strip()
+        if rel_match: meta["Release Date"] = rel_match.group(1).strip()
             
         mod_match = re.search(r'Last modified:\s*(\d{1,2}\s+\w+\s+\d{4})', table_text, re.I)
-        if mod_match:
-            meta["Last Modified"] = mod_match.group(1).strip()
+        if mod_match: meta["Last Modified"] = mod_match.group(1).strip()
             
         stat_match = re.search(r'Status:\s*(\w+)', table_text, re.I)
-        if stat_match:
-            meta["Status"] = stat_match.group(1).strip()
+        if stat_match: meta["Status"] = stat_match.group(1).strip()
 
     queue = []
     seen = set()
@@ -94,19 +115,15 @@ def scrape_table_logic(soup, anchor_id, table_class=None, find_meta=False):
     for row in rows:
         tds = row.find_all('td')
         if len(tds) < 2: continue
-
         is_sec = "Y" if "✓" in tds[0].get_text() else "N"
         apar_num, description = None, ""
-        
         for i, td in enumerate(tds):
             text = td.get_text(strip=True)
             match = re.search(r'[A-Z]{2}\d{5}', text)
             if match:
                 apar_num = match.group(0)
-                if i + 1 < len(tds):
-                    description = tds[i+1].get_text(strip=True)
+                if i + 1 < len(tds): description = tds[i+1].get_text(strip=True)
                 break
-        
         if apar_num and apar_num not in seen:
             seen.add(apar_num)
             queue.append({"num": apar_num, "isSecurity": is_sec, "table_desc": description})
@@ -118,33 +135,46 @@ def write_markdown_row(md_file, data, fields):
     md_file.write(row + "\n")
 
 def main():
-    print("--- IBM Consolidated APAR Scraper (WAS & IHS) ---")
-    user_version = input("Enter Fix Pack Version (e.g., 9.0.5.26 or 8.5.5.2.29): ").strip()
-    
-    version_anchor = user_version.replace(".", "")
+    print("--- IBM Consolidated APARs for for WAS and IHS version 8/9 ---")
+    user_version = input("Enter Fix Pack Version (e.g., 9.0.5.26 or 9.0.0.0/8.0.0.0 for latest): ").strip()
     headers = {"User-Agent": "Mozilla/5.0"}
+
+    # Base URLs for version detection
+    v9_base = "https://www.ibm.com/support/pages/fix-list-ibm-websphere-application-server-traditional-v9-0"
+    v8_base = "https://www.ibm.com/support/pages/fix-list-ibm-websphere-application-server-v85"
+
+    # AUTO-DETECT LATEST VERSION
+    if user_version in ["9.0.0.0", "8.0.0.0"]:
+        print(f"Version {user_version} detected. Finding latest released version...")
+        target_url = v9_base if user_version.startswith("9.") else v8_base
+        latest = find_latest_version(target_url, headers)
+        if latest:
+            print(f"Latest version found: {latest}")
+            user_version = latest
+        else:
+            print("Could not detect latest version. Proceeding with input.")
+
+    version_anchor = user_version.replace(".", "")
     fields = ["Source", "APAR Number", "isSecurity", "Title", "Reported component name", "Status", "PE", "HIPER", "Submitted date", "Closed date"]
     
     if user_version.startswith("9."):
-        was_url = f"https://www.ibm.com/support/pages/fix-list-ibm-websphere-application-server-traditional-v9-0#{version_anchor}"
-        
+        was_url = f"{v9_base}#{version_anchor}"
+        base_prefix = f"was9_fixpack_{version_anchor}"
     elif user_version.startswith("8."):
-        was_url = f"https://www.ibm.com/support/pages/fix-list-ibm-websphere-application-server-v85#{version_anchor}"
+        was_url = f"{v8_base}#{version_anchor}"
+        base_prefix = f"was8_fixpack_{version_anchor}"
     else:
         print("Error: Major version must be 8 or 9.")
         return
-    base_prefix = f"was_fixpack_{version_anchor}"
-    counts = {"WAS": 0, "IHS": 0}
-    # Storage for the metadata to be printed at the end
-    collected_meta = {}
 
+    counts = {"WAS": 0, "IHS": 0}
+    collected_meta = {}
     sources = [
         {"name": "WAS", "url": was_url, "class": "bx--data-table", "find_meta": True},
         {"name": "IHS", "url": "https://www.ibm.com/support/pages/node/617655", "class": "bx--data-table", "find_meta": False}
     ]
 
-    final_csv = None
-    final_md = None
+    final_csv, final_md = None, None
 
     for src in sources:
         print(f"\nProcessing {src['name']}...")
@@ -154,19 +184,16 @@ def main():
                 soup = BeautifulSoup(resp.text, 'html.parser')
                 queue, meta = scrape_table_logic(soup, version_anchor, table_class=src['class'], find_meta=src['find_meta'])
                 
-                # Store WAS metadata for later printing
                 if src['find_meta']:
                     collected_meta = meta
                     file_date = format_date_for_file(meta['Release Date'])
                     final_csv = f"{base_prefix}_{file_date}.csv"
                     final_md = f"{base_prefix}_{file_date}.md"
                 
-                # Ensure files are initialized if WAS fails or has no date
                 if not final_csv:
                     final_csv = f"{base_prefix}_NoDate.csv"
                     final_md = f"{base_prefix}_NoDate.md"
 
-                # Initialize Files only once
                 if not os.path.exists(final_csv):
                     with open(final_csv, mode='w', newline='', encoding='utf-8') as cf, \
                          open(final_md, mode='w', encoding='utf-8') as mf:
@@ -189,21 +216,10 @@ def main():
         except Exception as e:
             print(f"Error processing {src['name']}: {e}")
 
-    # --- FINAL OUTPUT SUMMARY ---
-    print(f"\n" + "="*45)
-    print(f"FIX PACK DETAILS ({user_version})")
-    print(f"="*45)
+    print(f"\n" + "="*45 + f"\nFIX PACK DETAILS ({user_version})\n" + "="*45)
     if collected_meta:
-        print(f"Fix Release Date: {collected_meta.get('Release Date')}")
-        print(f"Last Modified:    {collected_meta.get('Last Modified')}")
-        print(f"Status:           {collected_meta.get('Status')}")
-    else:
-        print("Metadata: Not Found")
-    print("-"*45)
-    print(f"CSV Report: {final_csv}")
-    print(f"MD Report:  {final_md}")
-    print(f"Totals:     WAS ({counts['WAS']}), IHS ({counts['IHS']})")
-    print("="*45)
+        print(f"Fix Release Date: {collected_meta.get('Release Date')}\nLast Modified:    {collected_meta.get('Last Modified')}\nStatus:           {collected_meta.get('Status')}")
+    print("-"*45 + f"\nCSV Report: {final_csv}\nMD Report:  {final_md}\nTotals:     WAS ({counts['WAS']}), IHS ({counts['IHS']})\n" + "="*45)
 
 if __name__ == "__main__":
     main()

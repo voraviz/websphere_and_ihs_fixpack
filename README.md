@@ -5,6 +5,7 @@ This Python script retrieves IBM's support pages to gather information about APA
 ## Features
 
 *   **Consolidated Data:** Gathers APARs for both WebSphere Application Server and IBM HTTP Server.
+*   **Latest Fix Pack:** if input with 8.0.0.0 or 9.0.0.0
 *   **Fix Pack Specific:** Fetches the list of APARs associated with a user-provided fix pack version (e.g., `9.0.5.26`).
 *   **Detailed Metadata:** For non-security APARs, it visits the individual APAR page to scrape metadata such as Component, Status, Submitted/Closed dates, and more.
 *   **Dual Export:** Saves all collected information into clean, easy-to-use CSV and Markdown files.
