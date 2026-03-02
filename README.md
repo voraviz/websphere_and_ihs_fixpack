@@ -32,7 +32,7 @@ pip install requests beautifulsoup4
 
 ```
 --- IBM Consolidated APAR Scraper (WAS & IHS) ---
-Enter Fix Pack Version (e.g., 9.0.5.26 or 8.5.5.29): 9.0.5.26
+Enter Fix Pack Version (e.g., 9.0.5.26 or 9.0.0.0 for latest): 9.0.5.26
 
 [1/2] Processing WAS...
    [1/27] PH66923 (WAS)
