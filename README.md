@@ -75,6 +75,9 @@ IHS,PH67551,N,Fix potential bug in PH61590 and adderror_loglogging,WAS IHS ZOS,C
 IHS,PH67676,N,Add additional directories torpath/runpathofhttpdbinaries,N/A,N/A,N/A,N/A,N/A,N/A
 ```
 ### Example MD Output ([was9_fixpack_90526_20251202.md](was9_fixpack_90526_20251202.md))
+
+![](images/report_markdown.png)
+
 ## Important Note on Security APARs
 
 For APARs marked as security-related (`isSecurity` = `Y`), the script **does not** scrape the individual APAR detail page. This is an intentional design choice due to different APAR detailed inforamtion. You can find more information from CVE and CVSS in column title. 
