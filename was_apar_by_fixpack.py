@@ -159,14 +159,12 @@ def main():
     
     if user_version.startswith("9."):
         was_url = f"{v9_base}#{version_anchor}"
-        base_prefix = f"was9_fixpack_{version_anchor}"
     elif user_version.startswith("8."):
         was_url = f"{v8_base}#{version_anchor}"
-        base_prefix = f"was8_fixpack_{version_anchor}"
     else:
         print("Error: Major version must be 8 or 9.")
         return
-
+    base_prefix = f"was_fixpack_{version_anchor}"
     counts = {"WAS": 0, "IHS": 0}
     collected_meta = {}
     sources = [
