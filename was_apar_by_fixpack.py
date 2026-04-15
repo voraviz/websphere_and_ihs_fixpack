@@ -216,8 +216,9 @@ def main():
 
     print(f"\n" + "="*45 + f"\nFIX PACK DETAILS ({user_version})\n" + "="*45)
     if collected_meta:
-        print(f"Fix Release Date: {collected_meta.get('Release Date')}\nLast Modified:    {collected_meta.get('Last Modified')}\nStatus:           {collected_meta.get('Status')}")
+        print(f"Fix Release Date: {collected_meta.get('Release Date')}\nLast Modified:    {collected_meta.get('Last Modified')}\nStatus:           {collected_meta.get('Status')}\nURL:              {was_url}")
     print("-"*45 + f"\nCSV Report: {final_csv}\nMD Report:  {final_md}\nTotals:     WAS ({counts['WAS']}), IHS ({counts['IHS']})\n" + "="*45)
+
 
 if __name__ == "__main__":
     main()
